@@ -38,7 +38,8 @@ from utils import (
 
 class Trainer(StateDictMixin):
     def __init__(self, cfg: DictConfig, root_dir: Path) -> None:
-        torch.backends.cuda.matmul.allow_tf32 = True
+        if cfg.common.device == 'cuda':
+            torch.backends.cuda.matmul.allow_tf32 = True
         OmegaConf.resolve(cfg)
         self._cfg = cfg
         self._rank = dist.get_rank() if dist.is_initialized() else 0
@@ -48,7 +49,7 @@ class Trainer(StateDictMixin):
         set_seed(torch.seed() % 10 ** 9)
 
         # Device
-        self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu", self._rank)
+        self._device = torch.device(cfg.common.device)#torch.device("cuda" if torch.cuda.is_available() else "mps", self._rank)
         print(f"Starting on {self._device}")
         self._use_cuda = self._device.type == "cuda"
         if self._use_cuda:

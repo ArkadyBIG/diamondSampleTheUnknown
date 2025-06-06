@@ -8,10 +8,10 @@ hydra:
     chdir: True
 
 wandb:
-  mode: disabled
-  project: null
-  entity: null
-  name: null
+  mode: online
+  project: SampleTheUnknown
+  entity: arkady_big
+  name: fromPaper
   group: null
   tags: null
   notes: null
@@ -23,13 +23,13 @@ initialization:
   load_actor_critic: True
 
 common:
-  devices: 0  # int, list of int, cpu, or all 
+  device: mps  # int, list of int, cpu, or all 
   seed: null
   resume: False # do not modify, set by scripts/resume.sh only.
 
 checkpointing:
-  save_agent_every: 5
-  num_to_keep: 11  # number of checkpoints to keep, use null to disable
+  save_agent_every: 1
+  num_to_keep: null  # number of checkpoints to keep, use null to disable
 
 collection:
   train:
