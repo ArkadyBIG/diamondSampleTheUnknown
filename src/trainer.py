@@ -57,9 +57,9 @@ class Trainer(StateDictMixin):
 
         # Init wandb
         if self._rank == 0:
-            try_until_no_except(
-                partial(wandb.init, config=OmegaConf.to_container(cfg, resolve=True), reinit=True, resume=True, **cfg.wandb)
-            )
+            partial(wandb.init, config=OmegaConf.to_container(cfg, resolve=True), reinit=True, resume=True, **cfg.wandb)()
+            # try_until_no_except(
+            # )
 
         # Flags
         self._is_static_dataset = cfg.static_dataset.path is not None
