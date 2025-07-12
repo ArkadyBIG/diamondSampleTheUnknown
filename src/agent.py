@@ -4,6 +4,7 @@ from typing import Union
 
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
 from envs import TorchEnv, WorldModelEnv
 from models.actor_critic import ActorCritic, ActorCriticConfig, ActorCriticLossConfig
@@ -41,9 +42,10 @@ class Agent(nn.Module):
         sigma_distribution_cfg: SigmaDistributionConfig,
         actor_critic_loss_cfg: ActorCriticLossConfig,
         rl_env: Union[TorchEnv, WorldModelEnv],
+        dl_actor_critic_discriminant: DataLoader
     ) -> None:
         self.denoiser.setup_training(sigma_distribution_cfg)
-        self.actor_critic.setup_training(rl_env, actor_critic_loss_cfg)
+        self.actor_critic.setup_training(rl_env, actor_critic_loss_cfg, dl_actor_critic_discriminant)
 
     def load(
         self,

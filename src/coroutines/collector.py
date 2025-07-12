@@ -52,7 +52,7 @@ def make_collector(
 
     while True:
         with torch.no_grad():
-            all_obs, act, rew, end, trunc, *_, [infos] = env_loop.send(1)
+            all_obs, act, rew, end, trunc, *_, [infos], _ = env_loop.send(1)
 
         num_steps += num_envs
         pbar.update(num_envs if num_to_collect.steps is not None else 0)

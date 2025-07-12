@@ -171,7 +171,7 @@ class Trainer(StateDictMixin):
 
         if self._is_model_free:
             rl_env = make_atari_env(num_envs=cfg.actor_critic.training.batch_size, device=self._device, **cfg.env.train)
-
+            dl_actor_critic_discriminant = None
         else:
             c = cfg.actor_critic.training
             sl = cfg.agent.denoiser.inner_model.num_steps_conditioning
@@ -183,11 +183,15 @@ class Trainer(StateDictMixin):
             if cfg.training.compile_wm:
                 rl_env.predict_next_obs = torch.compile(rl_env.predict_next_obs, mode="reduce-overhead")
                 rl_env.predict_rew_end = torch.compile(rl_env.predict_rew_end, mode="reduce-overhead")
+                
+            sl = cfg.world_model_env.horizon
+            bs = make_batch_sampler(c.batch_size, sl, get_sample_weights(c.sample_weights))
+            dl_actor_critic_discriminant = make_data_loader(batch_sampler=bs)
 
         # Setup training
         sigma_distribution_cfg = instantiate(cfg.denoiser.sigma_distribution)
         actor_critic_loss_cfg = instantiate(cfg.actor_critic.actor_critic_loss)
-        self.agent.setup_training(sigma_distribution_cfg, actor_critic_loss_cfg, rl_env)
+        self.agent.setup_training(sigma_distribution_cfg, actor_critic_loss_cfg, rl_env, dl_actor_critic_discriminant)
 
         # Training state (things to be saved/restored)
         self.epoch = 0

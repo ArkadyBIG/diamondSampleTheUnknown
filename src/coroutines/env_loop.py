@@ -28,7 +28,7 @@ def make_env_loop(
         n = 0
 
         while n < num_steps:
-            logits_act, val, (hx, cx) = model.predict_act_value(obs, (hx, cx))
+            logits_act, val, (hx, cx), logits_disc = model.predict_act_value(obs, (hx, cx))
             act = Categorical(logits=logits_act).sample()
 
             if random.random() < epsilon:
@@ -46,29 +46,29 @@ def make_env_loop(
 
             if dead.any():
                 with torch.no_grad():
-                    _, val_final_obs, _ = model.predict_act_value(info["final_observation"], (hx[dead], cx[dead]))
+                    _, val_final_obs, _, _ = model.predict_act_value(info["final_observation"], (hx[dead], cx[dead]))
                 reset_gate = 1 - dead.float().unsqueeze(1)
                 hx = hx * reset_gate
                 cx = cx * reset_gate
                 if "burnin_obs" in info:
                     burnin_obs = info["burnin_obs"]
                     for i in range(burnin_obs.size(1)):
-                        _, _, (hx[dead], cx[dead]) = model.predict_act_value(burnin_obs[:, i], (hx[dead], cx[dead]))
+                        _, _, (hx[dead], cx[dead]), _ = model.predict_act_value(burnin_obs[:, i], (hx[dead], cx[dead]))
 
-            all_.append([obs, act, rew, end, trunc, logits_act, val, None])
+            all_.append([obs, act, rew, end, trunc, logits_act, val, logits_disc, None])
             infos.append(info)
 
             obs = next_obs
             n += 1
 
         with torch.no_grad():
-            _, val_bootstrap, _ = model.predict_act_value(next_obs, (hx, cx))  # do not update hx/cx
+            _, val_bootstrap, _, _ = model.predict_act_value(next_obs, (hx, cx))  # do not update hx/cx
 
         if dead.any():
             val_bootstrap[dead] = val_final_obs
 
         all_[-1][-1] = val_bootstrap
 
-        all_obs, act, rew, end, trunc, logits_act, val, val_bootstrap = (torch.stack(x, dim=1) for x in zip(*all_))
+        all_obs, act, rew, end, trunc, logits_act, val, logits_disc, val_bootstrap = (torch.stack(x, dim=1) for x in zip(*all_))
 
-        num_steps = yield all_obs, act, rew, end, trunc, logits_act, val, val_bootstrap, infos
+        num_steps = yield all_obs, act, rew, end, trunc, logits_act, val, val_bootstrap, infos, logits_disc
