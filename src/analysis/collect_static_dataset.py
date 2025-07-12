@@ -35,7 +35,7 @@ if __name__ == '__main__':
         cfg = hydra.compose(config_name='trainer')
 
     device = torch.device(cfg.common.device)
-    test_env = make_atari_env(num_envs=cfg.collection.test.num_envs, device=device, **cfg.env.test)
+    test_env = make_atari_env(num_envs=4, device=device, **cfg.env.test)
     num_actions = int(test_env.num_actions)
     agent = Agent(instantiate(cfg.agent, num_actions=num_actions)).to(device)
     wm_env_cfg = instantiate(cfg.world_model_env, num_batches_to_preload=1)
@@ -50,3 +50,7 @@ if __name__ == '__main__':
         collector = make_collector(test_env, agent.actor_critic, dataset, epsilon=args.epsilon)
         collector.send(NumToCollect(steps=n_ep))
         dataset.save_to_default_path()
+        print("\nSummary of collect:")
+        print(f"Num steps: {n_ep} ")
+        print(f"Reward counts: {dict(dataset.counter_rew)}")
+        print(f"Average duration of an eposode: {n_ep / dataset.num_episodes}")
