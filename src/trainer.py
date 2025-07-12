@@ -94,6 +94,8 @@ class Trainer(StateDictMixin):
         p = Path(cfg.static_dataset.path) if self._is_static_dataset else Path("dataset")
         self.train_dataset = Dataset(p / "train", "train_dataset", cfg.training.cache_in_ram, use_manager)
         self.test_dataset = Dataset(p / "test", "test_dataset", cache_in_ram=True)
+        self.train_dataset.is_static = self._is_static_dataset
+        self.test_dataset.is_static = self._is_static_dataset
         self.train_dataset.load_from_default_path()
         self.test_dataset.load_from_default_path()
 
@@ -112,7 +114,7 @@ class Trainer(StateDictMixin):
 
         if cfg.initialization.path_to_ckpt is not None:
             self.agent.load(**cfg.initialization)
-
+        self.test_non_static_dataset = None
         # Collectors
         if not self._is_static_dataset and self._rank == 0:
             self._train_collector = make_collector(
@@ -120,6 +122,12 @@ class Trainer(StateDictMixin):
             )
             self._test_collector = make_collector(
                 test_env, self.agent.actor_critic, self.test_dataset, cfg.collection.test.epsilon, reset_every_collect=True
+            )
+        elif cfg.collection.test.force:
+            self.test_non_static_dataset = Dataset('dataset/test_non_static_dataset', "test_non_static_dataset", cache_in_ram=True)
+            self.test_non_static_dataset.load_from_default_path()
+            self._test_collector = make_collector(
+                test_env, self.agent.actor_critic, self.test_non_static_dataset, cfg.collection.test.epsilon, reset_every_collect=True
             )
 
         ######################################################
@@ -243,7 +251,7 @@ class Trainer(StateDictMixin):
 
             # Evaluation
             should_test = self._rank == 0 and self._cfg.evaluation.should and (self.epoch % self._cfg.evaluation.every == 0)
-            should_collect_test = should_test and not self._is_static_dataset
+            should_collect_test = should_test and (not self._is_static_dataset or self._cfg.collection.test.force)
 
             if should_collect_test:
                 to_log += self.collect_test()
@@ -264,7 +272,7 @@ class Trainer(StateDictMixin):
                 dist.barrier()
 
         # Last collect
-        if self._rank == 0 and not self._is_static_dataset:
+        if self._rank == 0 and (not self._is_static_dataset or self._cfg.collection.test.force):
             wandb_log(self.collect_test(final=True), self.epoch)
 
     def collect_initial_dataset(self) -> Tuple[int, Logs]:
@@ -303,13 +311,13 @@ class Trainer(StateDictMixin):
     def collect_test(self, final: bool = False) -> Logs:
         c = self._cfg.collection.test
         episodes = c.num_final_episodes if final else c.num_episodes
-        td = self.test_dataset
+        td = self.test_dataset if self.test_non_static_dataset is None else self.test_non_static_dataset
         td.clear()
         to_log = self._test_collector.send(NumToCollect(episodes=episodes))
         key_ep_id = f"{td.name}/episode_id"
         to_log = [{k: v + self.num_episodes_test if k == key_ep_id else v for k, v in x.items()} for x in to_log]
 
-        print(f"\nSummary of {'final' if final else 'test'} collect: {td.num_episodes} episodes ({td.num_steps} steps)")
+        print(f"\n[{td.name}] Summary of {'final' if final else 'test'} collect: {td.num_episodes} episodes ({td.num_steps} steps)")
         keys = [key_ep_id, "return", "length"]
         to_log_episodes = [x for x in to_log if set(x.keys()) == set(keys)]
         episode_ids, returns, lengths = [[d[k] for d in to_log_episodes] for k in keys]
@@ -321,6 +329,9 @@ class Trainer(StateDictMixin):
         if final:
             to_log.append({"final_return_mean": np.mean(returns), "final_return_std": np.std(returns)})
             print(to_log[-1])
+        to_log.append({f"{td.name}/return_mean": np.mean(returns), f"{td.name}/return_std": np.std(returns)})
+        to_log.append({f"{td.name}/length_mean": np.mean(lengths), f"{td.name}/length_std": np.std(lengths)})
+        
 
         return to_log
 

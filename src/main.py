@@ -18,7 +18,7 @@ OmegaConf.register_new_resolver("eval", eval)
 @hydra.main(config_path="../config", config_name="trainer", version_base="1.3")
 def main(cfg: DictConfig) -> None:
     if cfg.common.device == 'cuda':
-        setup_visible_cuda_devices(cfg.common.devices)
+        setup_visible_cuda_devices(0)
     world_size = torch.cuda.device_count()
     root_dir = Path(hydra.utils.get_original_cwd())
     if world_size < 2:

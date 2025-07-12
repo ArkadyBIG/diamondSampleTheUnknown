@@ -66,8 +66,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('actor_path')
     parser.add_argument('denoiser_path')
+    parser.add_argument('save_episodes_dir')
     parser.add_argument('save_dir')
-    parser.add_argument('--episodes-to-collect', type=int, default=5)
+    parser.add_argument('--steps-to-collect', type=int, default=5)
     parser.add_argument('--autoregresive-length', type=int, default=100)
     
     args = parser.parse_args()
@@ -84,14 +85,14 @@ if __name__ == '__main__':
     wm_env_cfg = instantiate(cfg.world_model_env, num_batches_to_preload=1)
     
     actor_path = Path(args.actor_path)
-    n_ep = args.episodes_to_collect
-    dataset = Dataset(Path(f"dataset/{str(actor_path).split('/')[-4]}/{actor_path.stem}_{n_ep}"))
+    n_ep = args.steps_to_collect
+    dataset = Dataset(Path(args.save_episodes_dir))
     dataset.load_from_default_path()
     
     if len(dataset) == 0:
         agent.load(path_to_ckpt=actor_path)
         collector = make_collector(test_env, agent.actor_critic, dataset, epsilon=0)
-        collector.send(NumToCollect(episodes=n_ep))
+        collector.send(NumToCollect(steps=n_ep))
         dataset.save_to_default_path()
     steps_cond = cfg.agent.denoiser.inner_model.num_steps_conditioning
     bs = BatchSamplerFullEpisode(dataset, 0, 1, 1, steps_cond + args.autoregresive_length, steps_cond + 1, None, False)
