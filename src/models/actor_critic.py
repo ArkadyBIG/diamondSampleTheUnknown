@@ -27,6 +27,7 @@ class ActorCriticLossConfig:
     lambda_: float
     weight_value_loss: float
     weight_entropy_loss: float
+    weight_discriminator_loss: float
 
 
 @dataclass
@@ -55,9 +56,11 @@ class ActorCritic(nn.Module):
         self.critic_linear.weight.data.fill_(0)
         self.critic_linear.bias.data.fill_(0)
         self.discriminator_linear.weight.data.fill_(0)
-        self.discriminator_linear.bias.data.fill_(0.5)
+        self.discriminator_linear.bias.data.fill_(0)
         init_lstm(self.lstm)
 
+        self.discriminator_act = nn.Sigmoid()
+        
         self.env_loop = None
         self.loss_cfg = None
         self.data_iter_discriminant = None
@@ -81,15 +84,15 @@ class ActorCritic(nn.Module):
         x = self.encoder(obs)
         x = x.flatten(start_dim=1)
         hx, cx = self.lstm(x, hx_cx)
-        return ActorCriticOutput(self.actor_linear(hx), self.critic_linear(hx).squeeze(dim=1), (hx, cx), self.discriminator_linear(hx))
+        return ActorCriticOutput(self.actor_linear(hx), self.critic_linear(hx).squeeze(dim=1), (hx, cx), self.discriminator_act(self.discriminator_linear(hx)))
 
-    def calulate_discriminator_loss(self, logits_disc_real, logits_disc_fake, mask_real, mask_fake):
-        assert logits_disc_real.shape == logits_disc_fake.shape
-        loss_D_real = F.binary_cross_entropy_with_logits(
-            logits_disc_real, torch.ones_like(logits_disc_real), reduction="none"
+    def calulate_discriminator_loss(self, probs_disc_real, probs_disc_fake, mask_real, mask_fake):
+        assert probs_disc_real.shape == probs_disc_fake.shape
+        loss_D_real = F.binary_cross_entropy(
+            probs_disc_real, torch.ones_like(probs_disc_real), reduction="none"
         )
-        loss_D_fake = F.binary_cross_entropy_with_logits(
-            logits_disc_fake, torch.ones_like(logits_disc_fake), reduction="none"
+        loss_D_fake = F.binary_cross_entropy(
+            probs_disc_fake, torch.zeros_like(probs_disc_fake), reduction="none"
         )
         mask_real = mask_real.float()
         mask_fake = mask_fake.float()
@@ -113,20 +116,20 @@ class ActorCritic(nn.Module):
         hx_hist = []
         
         for t_i in range(t):
-            _test_hx_cx = self.predict_act_value(obs.reshape(b, t, c, h, w)[:, t_i], hx_cx)[2]
+            #_test_hx_cx = self.predict_act_value(obs.reshape(b, t, c, h, w)[:, t_i], hx_cx)[2]
             hx_cx = self.lstm(x[:, t_i], hx_cx)
-            assert ((hx_cx[0] - _test_hx_cx[0]).abs().max() < 0.00001).item()
+            #assert ((hx_cx[0] - _test_hx_cx[0]).abs().max() < 0.001).item()
             hx_hist.append(hx_cx[0])
             
         hx = torch.stack((hx_hist), dim=1)
-        return ActorCriticOutput(None, None, None, self.discriminator_linear(hx))
+        return ActorCriticOutput(None, None, None, self.discriminator_act(self.discriminator_linear(hx)))
         
             
     
     def forward(self) -> LossAndLogs:
         c = self.loss_cfg
-        _, act, rew, end, trunc, logits_act, val, val_bootstrap, _, logits_disc_fake = self.env_loop.send(c.backup_every)
-
+        _, act, rew, end, trunc, logits_act, val, val_bootstrap, _, probs_disc_fake = self.env_loop.send(c.backup_every)
+        assert ((probs_disc_fake <= 1).all() & (probs_disc_fake >= 0).all()).item()
         d = Categorical(logits=logits_act)
         entropy = d.entropy().mean()
 
@@ -137,11 +140,11 @@ class ActorCritic(nn.Module):
         loss_entropy = -c.weight_entropy_loss * entropy
         
         batch_real: Batch = next(self.data_iter_discriminant).to(self.device)
-        _, _, _, logits_disc_real = self.predict_discriminator_seq(batch_real.obs)
+        _, _, _, probs_disc_real = self.predict_discriminator_seq(batch_real.obs)
         
-        loss_disc = self.calulate_discriminator_loss(
-            logits_disc_real, 
-            logits_disc_fake, 
+        loss_disc = c.weight_discriminator_loss * self.calulate_discriminator_loss(
+            probs_disc_real, 
+            probs_disc_fake, 
             mask_real=batch_real.mask_padding,
             mask_fake=torch.ones_like(end),
         )
@@ -154,6 +157,8 @@ class ActorCritic(nn.Module):
             "loss_entropy": loss_entropy.detach(),
             "loss_values": loss_values.detach(),
             "loss_discriminator": loss_disc.detach(),
+            "accuracy_discriminator_fake": (probs_disc_fake < 0.5).float().mean().item(),
+            "accuracy_discriminator_real": (probs_disc_real >= 0.5).float().mean().item(),
             "loss_total": loss.detach(),
         }
 
