@@ -6,12 +6,16 @@ defaults:
 hydra:
   job:
     chdir: True
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  run:
+    dir: /scratch/gpfs/at3549/tmp/outputs/PaperWithDiscV3_001disc/${now:%H-%M-%S}
 
 wandb:
-  mode: online
+  mode: offline
   project: SampleTheUnknown
   entity: arkady_big
-  name: fromPaper
+  name: PaperWithDiscV3_001disc
   group: null
   tags: null
   notes: null
@@ -23,17 +27,17 @@ initialization:
   load_actor_critic: True
 
 common:
-  device: mps  # int, list of int, cpu, or all 
+  device: cuda  # int, list of int, cpu, or all 
   seed: null
   resume: False # do not modify, set by scripts/resume.sh only.
 
 checkpointing:
-  save_agent_every: 1
+  save_agent_every: 50
   num_to_keep: null  # number of checkpoints to keep, use null to disable
 
 collection:
   train:
-    num_envs: 1
+    num_envs: 4
     epsilon: 0.01
     num_steps_total: 100000
     first_epoch:
@@ -42,10 +46,11 @@ collection:
       threshold_rew: 10
     steps_per_epoch: 100
   test:
-    num_envs: 1
-    num_episodes: 4
+    num_envs: 4
+    num_episodes: 100
     epsilon: 0.0
     num_final_episodes: 100
+    force: True
 
 static_dataset:
   path: null  # if specified, will disable train/test data collection
@@ -61,7 +66,7 @@ training:
 
 evaluation:
   should: True
-  every: 10
+  every: 1
 
 world_model_env:
   _target_: envs.WorldModelEnvConfig
@@ -138,6 +143,7 @@ actor_critic:
     lambda_: 0.95
     weight_value_loss: 1.0
     weight_entropy_loss: 0.001
+    weight_discriminator_loss: 0.01
 
   optimizer:
     lr: 1e-4

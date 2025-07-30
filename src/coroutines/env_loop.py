@@ -28,7 +28,7 @@ def make_env_loop(
         n = 0
 
         while n < num_steps:
-            logits_act, val, (hx, cx), logits_disc = model.predict_act_value(obs, (hx, cx))
+            logits_act, val, (hx, cx), probs_disc = model.predict_act_value(obs, (hx, cx))
             act = Categorical(logits=logits_act).sample()
 
             if random.random() < epsilon:
@@ -55,7 +55,7 @@ def make_env_loop(
                     for i in range(burnin_obs.size(1)):
                         _, _, (hx[dead], cx[dead]), _ = model.predict_act_value(burnin_obs[:, i], (hx[dead], cx[dead]))
 
-            all_.append([obs, act, rew, end, trunc, logits_act, val, logits_disc, None])
+            all_.append([obs, act, rew, end, trunc, logits_act, val, probs_disc, None])
             infos.append(info)
 
             obs = next_obs
@@ -69,6 +69,6 @@ def make_env_loop(
 
         all_[-1][-1] = val_bootstrap
 
-        all_obs, act, rew, end, trunc, logits_act, val, logits_disc, val_bootstrap = (torch.stack(x, dim=1) for x in zip(*all_))
+        all_obs, act, rew, end, trunc, logits_act, val, probs_disc, val_bootstrap = (torch.stack(x, dim=1) for x in zip(*all_))
 
-        num_steps = yield all_obs, act, rew, end, trunc, logits_act, val, val_bootstrap, infos, logits_disc
+        num_steps = yield all_obs, act, rew, end, trunc, logits_act, val, val_bootstrap, infos, probs_disc
