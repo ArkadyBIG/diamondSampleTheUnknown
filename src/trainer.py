@@ -140,7 +140,7 @@ class Trainer(StateDictMixin):
         def build_lr_sched(name: str) -> torch.optim.lr_scheduler.LambdaLR:
             return get_lr_sched(self.opt.get(name), getattr(cfg, name).training.lr_warmup_steps)
 
-        self._model_names = ["denoiser", "rew_end_model", "actor_critic"]
+        self._model_names = ["denoiser", "rew_end_model", "actor_critic", "discriminator"]
         self.opt = CommonTools(*map(build_opt, self._model_names))
         self.lr_sched = CommonTools(*map(build_lr_sched, self._model_names))
 
@@ -171,9 +171,14 @@ class Trainer(StateDictMixin):
         bs = make_batch_sampler(c.batch_size, c.seq_length, get_sample_weights(c.sample_weights), can_sample_beyond_end=True)
         dl_rew_end_model_train = make_data_loader(batch_sampler=bs)
         dl_rew_end_model_test = DatasetTraverser(self.test_dataset, c.batch_size, c.seq_length)
+        
+        c = cfg.discriminator.training
+        bs = make_batch_sampler(c.batch_size, c.seq_length, get_sample_weights(c.sample_weights), can_sample_beyond_end=True)
+        dl_discriminator_train = make_data_loader(batch_sampler=bs)
+        dl_discriminator_test = DatasetTraverser(self.test_dataset, c.batch_size, c.seq_length)
 
-        self._data_loader_train = CommonTools(dl_denoiser_train, dl_rew_end_model_train, None)
-        self._data_loader_test = CommonTools(dl_denoiser_test, dl_rew_end_model_test, None)
+        self._data_loader_train = CommonTools(dl_denoiser_train, dl_rew_end_model_train, None, dl_discriminator_train)
+        self._data_loader_test = CommonTools(dl_denoiser_test, dl_rew_end_model_test, None, dl_discriminator_test)
 
         # RL env
 
@@ -201,8 +206,8 @@ class Trainer(StateDictMixin):
         self.epoch = 0
         self.num_epochs_collect = None
         self.num_episodes_test = 0
-        self.num_batch_train = CommonTools(0, 0, 0)
-        self.num_batch_test = CommonTools(0, 0, 0)
+        self.num_batch_train = CommonTools(0, 0, 0, 0)
+        self.num_batch_test = CommonTools(0, 0, 0, 0)
 
         if cfg.common.resume:
             self.load_state_checkpoint()

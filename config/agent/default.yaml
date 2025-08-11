@@ -31,3 +31,13 @@ actor_critic:
   channels: [32,32,64,64]
   down: [1,1,1,1]
 
+discriminator:
+  _target_: models.discriminator.DiscriminatorConfig
+  lstm_dim: 512
+  img_channels: ${agent.denoiser.inner_model.img_channels}
+  img_size: ${env.train.size}
+  cond_channels: 128
+  depths: [2,2,2,2]
+  channels: [32,32,32,32]
+  attn_depths: [0,0,0,0]
+  backup_every: ${actor_critic.actor_critic_loss.backup_every}
