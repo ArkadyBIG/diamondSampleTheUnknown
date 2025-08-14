@@ -140,7 +140,7 @@ class Trainer(StateDictMixin):
         def build_lr_sched(name: str) -> torch.optim.lr_scheduler.LambdaLR:
             return get_lr_sched(self.opt.get(name), getattr(cfg, name).training.lr_warmup_steps)
 
-        self._model_names = ["denoiser", "rew_end_model", "actor_critic", "discriminator"]
+        self._model_names = ["denoiser", "rew_end_model", "discriminator", "actor_critic"]
         self.opt = CommonTools(*map(build_opt, self._model_names))
         self.lr_sched = CommonTools(*map(build_lr_sched, self._model_names))
 

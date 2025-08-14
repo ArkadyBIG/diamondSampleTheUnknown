@@ -6,9 +6,14 @@ defaults:
 hydra:
   job:
     chdir: True
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  run:
+    dir: /scratch/gpfs/at3549/tmp/outputs/PaperV2_doublecheck_oldmain/${now:%H-%M-%S}
+
 
 wandb:
-  mode: online
+  mode: offline
   project: SampleTheUnknown
   entity: arkady_big
   name: fromPaper
