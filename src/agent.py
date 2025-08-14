@@ -9,7 +9,9 @@ from envs import TorchEnv, WorldModelEnv
 from models.actor_critic import ActorCritic, ActorCriticConfig, ActorCriticLossConfig
 from models.diffusion import Denoiser, DenoiserConfig, SigmaDistributionConfig
 from models.rew_end_model import RewEndModel, RewEndModelConfig
+from models.discriminator import Discriminator, DiscriminatorConfig
 from utils import extract_state_dict
+from coroutines.env_loop import make_env_loop
 
 
 @dataclass
@@ -17,12 +19,14 @@ class AgentConfig:
     denoiser: DenoiserConfig
     rew_end_model: RewEndModelConfig
     actor_critic: ActorCriticConfig
+    discriminator: DiscriminatorConfig
     num_actions: int
 
     def __post_init__(self) -> None:
         self.denoiser.inner_model.num_actions = self.num_actions
         self.rew_end_model.num_actions = self.num_actions
         self.actor_critic.num_actions = self.num_actions
+        self.discriminator.num_actions = self.num_actions
 
 
 class Agent(nn.Module):
@@ -31,6 +35,7 @@ class Agent(nn.Module):
         self.denoiser = Denoiser(cfg.denoiser)
         self.rew_end_model = RewEndModel(cfg.rew_end_model)
         self.actor_critic = ActorCritic(cfg.actor_critic)
+        self.discriminator = Discriminator(cfg.discriminator)
 
     @property
     def device(self):
@@ -43,7 +48,10 @@ class Agent(nn.Module):
         rl_env: Union[TorchEnv, WorldModelEnv],
     ) -> None:
         self.denoiser.setup_training(sigma_distribution_cfg)
-        self.actor_critic.setup_training(rl_env, actor_critic_loss_cfg)
+        
+        env_loop = make_env_loop(rl_env, self.actor_critic)
+        self.actor_critic.setup_training(env_loop, actor_critic_loss_cfg)
+        self.discriminator.setup_training(env_loop)
 
     def load(
         self,

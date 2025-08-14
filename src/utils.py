@@ -86,6 +86,7 @@ class CommonTools(StateDictMixin):
     denoiser: Any
     rew_end_model: Any
     actor_critic: Any
+    discriminator: Any
 
     def get(self, name: str) -> Any:
         return getattr(self, name)

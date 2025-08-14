@@ -10,7 +10,6 @@ from torch.distributions.categorical import Categorical
 import torch.nn.functional as F
 
 from .blocks import Conv3x3, SmallResBlock
-from coroutines.env_loop import make_env_loop
 from envs import TorchEnv, WorldModelEnv
 from utils import init_lstm, LossAndLogs
 
@@ -60,9 +59,9 @@ class ActorCritic(nn.Module):
     def device(self) -> torch.device:
         return self.lstm.weight_hh.device
 
-    def setup_training(self, rl_env: Union[TorchEnv, WorldModelEnv], loss_cfg: ActorCriticLossConfig) -> None:
+    def setup_training(self, env_loop, loss_cfg: ActorCriticLossConfig) -> None:
         assert self.env_loop is None and self.loss_cfg is None
-        self.env_loop = make_env_loop(rl_env, self)
+        self.env_loop = env_loop
         self.loss_cfg = loss_cfg
 
     def predict_act_value(self, obs: Tensor, hx_cx: Tuple[Tensor, Tensor]) -> ActorCriticOutput:
