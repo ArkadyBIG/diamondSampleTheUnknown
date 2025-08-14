@@ -89,17 +89,18 @@ class Discriminator(nn.Module):
         logits_real, _ = self.predict_real_fake(obs, act, rew.long(), end.long(), next_obs, reset_hidden=1 - mask.float())
         logits_real = logits_real[mask]
 
-        loss_real = F.cross_entropy(logits_real, torch.ones(logits_real.shape[:-1], device=logits_real.device))
+        loss_real = F.cross_entropy(logits_real, torch.ones(logits_real.shape[:-1], device=logits_real.device, dtype=int))
         
         obs, act, rew, end, trunc, _, _, _, _ = self.env_loop.send(self.cfg.backup_every)
+        rew += 1 # in {0, 1, 2}
         logits_fake, _ = self.predict_real_fake(obs[:, :-1], act[:, :-1], rew[:, :-1].long(), end[:, :-1].long(), obs[:, 1:], reset_hidden=(end + trunc).clip(max=1)[:, :-1])
         logits_fake = logits_fake.view(-1, 2)
-        loss_fake = F.cross_entropy(logits_fake, torch.zeros(logits_fake.shape[:-1], device=logits_fake.device))
+        loss_fake = F.cross_entropy(logits_fake, torch.zeros(logits_fake.shape[:-1], device=logits_fake.device, dtype=int))
 
         loss = (loss_real + loss_fake) / 2
 
         accuracy_real = (logits_real.argmax() == 1).float().mean()
-        accuracy_fake = (logits_fake.argmax() == 1).float().mean()
+        accuracy_fake = (logits_fake.argmax() == 0).float().mean()
         
         metrics = {
             "loss_real": loss_real.detach(),

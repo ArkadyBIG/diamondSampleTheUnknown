@@ -9,12 +9,12 @@ hydra:
   sweep:
     dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
   run:
-    dir: /scratch/gpfs/at3549/tmp/outputs/PaperV2_doublecheck_oldmain/${now:%H-%M-%S}
+    dir: /scratch/gpfs/at3549/tmp/outputs/PaperV2_oldmain_discriminatorV2/${now:%H-%M-%S}
 
 
 wandb:
   mode: offline
-  project: SampleTheUnknown
+  project: PaperV2_oldmain_discriminatorV2
   entity: arkady_big
   name: fromPaper
   group: null
@@ -28,7 +28,7 @@ initialization:
   load_actor_critic: True
 
 common:
-  device: mps  # int, list of int, cpu, or all 
+  device: cuda  # int, list of int, cpu, or all 
   seed: null
   resume: False # do not modify, set by scripts/resume.sh only.
 
@@ -151,12 +151,12 @@ actor_critic:
   
 discriminator:
   training:
-    seq_length: ${eval:'${world_model_env.horizon} + ${agent.denoiser.inner_model.num_steps_conditioning}'}
+    seq_length: ${actor_critic.actor_critic_loss.backup_every}
     start_after_epochs: 0
     steps_first_epoch: 10000
     steps_per_epoch: 400
     sample_weights: ${denoiser.training.sample_weights}
-    batch_size: 4
+    batch_size: 32
     grad_acc_steps: 1
     lr_warmup_steps: 100
     max_grad_norm: 100.0
